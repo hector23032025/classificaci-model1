@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Classificador d'imatges</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.5/dist/teachablemachine-image.min.js"></script>
+  <link rel="stylesheet" href="/style.css">
+  
+</head>
+<body>
+  
+  <h1>Classificador d'imatges</h1>
+<div class="div1">
+  <input type="file" id="fileInput" accept="image/*" />
+  <button class="boton" id="classifyBtn" disabled>Classificar</button>
+</div>
+  
+
+  <div class="div2">
+    <img  id="preview" alt="Imagen seleccionada" width="320" style="display:none; margin-top: 12px;" />
+  </div>
+
+  <div class="div3" id="resultado" style="margin-top: 12px;"></div>
+
+  <script>
+    const URL = "./model.1/";
+    let model;
+
+    const fileInput = document.getElementById("fileInput");
+    const preview = document.getElementById("preview");
+    const classifyBtn = document.getElementById("classifyBtn");
+    const resultado = document.getElementById("resultado");
+
+    classifyBtn.disabled = true;
+    fileInput.disabled = true;
+    resultado.innerHTML = "Cargando modelo...";
+
+    async function init() {
+      model = await tmImage.load(URL + "model.json", URL + "metadata.json");
+      fileInput.disabled = false;
+      resultado.innerHTML = "Modelo cargado. Selecciona una imagen.";
+    }
+
+    fileInput.addEventListener("change", (event) => {
+      const file = event.target.files[0];
+      if (!file) {
+        preview.style.display = "none";
+        classifyBtn.disabled = true;
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        preview.src = e.target.result;
+        preview.style.display = "block";
+        classifyBtn.disabled = !model;
+        resultado.innerHTML = "Imagen cargada. Pulsa 'Classificar'.";
+      };
+      reader.readAsDataURL(file);
+    });
+
+    classifyBtn.addEventListener("click", async () => {
+      if (!model) {
+        resultado.innerHTML = "El modelo aún está cargando.";
+        return;
+      }
+
+      if (!preview.src || preview.src === window.location.href) {
+        resultado.innerHTML = "Primero selecciona una imagen.";
+        return;
+      }
+
+      resultado.innerHTML = "Clasificando...";
+
+      const prediction = await model.predict(preview);
+      prediction.sort((a, b) => b.probability - a.probability);
+
+      const mejor = prediction[0];
+      resultado.innerHTML = "";
+
+      const clasePrincipal = document.createElement("p");
+      clasePrincipal.textContent =
+        "Clase: " + mejor.className + " — Confianza: " +
+        (mejor.probability * 100).toFixed(1) + "%";
+      resultado.appendChild(clasePrincipal);
+
+      const otrasClases = prediction.slice(1);
+      if (otrasClases.length > 0) {
+        const tituloOtrasClases = document.createElement("p");
+        tituloOtrasClases.textContent = "Otras clases y su confianza:";
+        resultado.appendChild(tituloOtrasClases);
+
+        const listaOtrasClases = document.createElement("ul");
+        otrasClases.forEach((clase) => {
+          const elemento = document.createElement("li");
+          elemento.textContent =
+            clase.className + ": " + (clase.probability * 100).toFixed(1) + "%";
+          listaOtrasClases.appendChild(elemento);
+        });
+        resultado.appendChild(listaOtrasClases);
+      }
+    });
+
+    init().catch(error => {
+      console.error("Error:", error);
+      resultado.innerHTML = "No se pudo cargar el modelo.";
+    });
+  </script>
+</body>
+</html>
